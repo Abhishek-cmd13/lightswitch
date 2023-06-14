@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    #floorplan {
+      position: relative;
+    }
+
+    .dot {
+      position: absolute;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+    }
+
+    .dot-red {
+      background-color: red;
+    }
+
+    .dot-green {
+      background-color: green;
+    }
+
+    #coordinates {
+      margin-top: 10px;
+    }
+  </style>
+</head>
+<body>
+  <h2>Room Vertices Locator</h2>
+  <p>Click on the floor plan image to select room vertices. Click "Send" to send the coordinates to the backend.</p>
+
+  <input type="file" id="floorplan-input" accept="image/*" onchange="loadFloorplan(event)">
+  <div id="floorplan"></div>
+
+  <div id="coordinates"></div>
+
+  <button onclick="sendPointsToBackend()">Send</button>
+  <button onclick="clearPoints()">Clear Points</button>
+
+  <script>
+    let floorplanImage;
+    let floorplanDiv;
+    let coordinatesDiv;
+    let points = [];
+    let dots = [];
+
+    // Load the floor plan image
+    function loadFloorplan(event) {
+      const file = event.target.files[0];
+      floorplanImage = URL.createObjectURL(file);
+
+      const img = document.createElement("img");
+      img.src = floorplanImage;
+
+      floorplanDiv = document.getElementById("floorplan");
+      floorplanDiv.innerHTML = "";
+      floorplanDiv.appendChild(img);
+
+      // Attach click event listener to the floor plan image
+      floorplanDiv.addEventListener("click", handleFloorplanClick);
+    }
+
+    // Handle click on the floor plan image
+    function handleFloorplanClick(event) {
+      // Get the coordinates of the click relative to the floor plan image
+      const rect = event.target.getBoundingClientRect();
+      const x = event.clientX - rect.left;
+      const y = event.clientY - rect.top;
+
+      // Show the coordinates of the clicked point
+      showCoordinates(x, y);
+
+      // Add the clicked point to the points array
+      points.push([x, y]);
+
+      // Create a dot element for the clicked point
+      const dot = createDot(x, y, "dot-red");
+      floorplanDiv.appendChild(dot);
+      dots.push(dot);
+    }
+
+    // Show the coordinates of the clicked point
+    function showCoordinates(x, y) {
+      coordinatesDiv = document.getElementById("coordinates");
+      coordinatesDiv.innerHTML += `Clicked Coordinates: X=${x}, Y=${y}<br>`;
+    }
+
+    // Send points to the backend
+    function sendPointsToBackend() {
+      // Send the points array to the backend
+      const request = new XMLHttpRequest();
+      request.open("POST", "http://localhost:8000/compute_centroids");
+      request.setRequestHeader("Content-Type", "application/json");
+
+      request.onload = function () {
+        if (request.status === 200) {
+          const response = JSON.parse(request.responseText);
+          // Display the sending and receiving data
+          console.log("Sending Data:", JSON.stringify(points));
+          console.log("Receiving Data:", JSON.stringify(response));
+
+          // Locate the received centroid on the map
+          locateCentroid(response.centroids[0]);
+
+          // Clear the points array and coordinates display
+          points = [];
+          coordinatesDiv.innerHTML = "";
+        }
+      };
+
+      const data = { points: points };
+      request.send(JSON.stringify(data));
+    }
+
+    // Locate the received centroid on the map
+    function locateCentroid(centroid) {
+      // Create a dot element for the centroid
+      const dot = createDot(centroid[0], centroid[1], "dot-green");
+      floorplanDiv.appendChild(dot);
+      dots.push(dot);
+    }
+
+    // Create a dot element at the given coordinates
+    function createDot(x, y, dotClass) {
+      const dot = document.createElement("div");
+      dot.className = "dot " + dotClass;
+      dot.style.left = x + "px";
+      dot.style.top = y + "px";
+      return dot;
+    }
+
+    // Clear all points on the image
+    function clearPoints() {
+      for (let dot of dots) {
+        floorplanDiv.removeChild(dot);
+      }
+      dots = [];
+      points = [];
+      coordinatesDiv.innerHTML = "";
+    }
+  </script>
+</body>
+</html>
